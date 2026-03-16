@@ -1,0 +1,6 @@
+spacy
+textacy
+docling
+termgraph
+wordfreq
+msoffcrypto-tool
