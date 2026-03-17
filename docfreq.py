@@ -19,6 +19,7 @@ import spacy
 
 
 SUPPORTED_EXTENSIONS = {".docx", ".txt", ".md"}
+SUPPORTED_SHELLS = ("bash", "zsh")
 
 
 class DocfreqError(Exception):
@@ -31,7 +32,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "input_paths",
-        nargs="+",
+        nargs="*",
         help="One or more paths to .docx, .txt, or .md files",
     )
     parser.add_argument("--top", type=int, default=30, help="Number of top results to show")
@@ -59,6 +60,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--password",
         help="Password for encrypted Office files. You can also set DOCFREQ_PASSWORD.",
+    )
+    parser.add_argument(
+        "--dump-text",
+        dest="dump_text_path",
+        nargs="?",
+        const="-",
+        help="Write the combined extracted text before counting. Use no value, '-' or /dev/stdout for stdout.",
+    )
+    parser.add_argument(
+        "--print-completion",
+        choices=SUPPORTED_SHELLS,
+        help="Print a shell completion script for bash or zsh and exit.",
     )
     parser.add_argument("--csv", dest="csv_path", help="Optional CSV output path")
     parser.add_argument(
@@ -96,6 +109,65 @@ def resolve_password(password: str | None) -> str | None:
     if env_password:
         return env_password
     return None
+
+
+def print_completion(shell: str) -> None:
+    scripts = {
+        "zsh": """#compdef docfreq
+_docfreq() {
+  _arguments -s \\
+    '--top[Number of top results to show]:count:' \\
+    '--ngrams[Comma-separated n-gram sizes to count]:n-grams:' \\
+    '--min-count[Minimum count required for a term]:count:' \\
+    '--keep-stopwords[Keep stopwords instead of filtering them out]' \\
+    '--no-lemma[Use the original token text instead of spaCy lemmas]' \\
+    '--password[Password for encrypted Office files]:password:' \\
+    '--dump-text=-[Write extracted text before counting]:output path:_files' \\
+    '--csv[Write results to CSV]:csv file:_files' \\
+    '--plot[Render terminal bar charts for requested n-grams]' \\
+    '--print-completion[Print a shell completion script and exit]:shell:(bash zsh)' \\
+    '*:input file:_files'
+}
+compdef _docfreq docfreq
+""",
+        "bash": """_docfreq_completion() {
+  local cur prev
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+  case "$prev" in
+    --top|--min-count)
+      return 0
+      ;;
+    --ngrams)
+      COMPREPLY=( $(compgen -W "1 1,2 1,2,3 2 3" -- "$cur") )
+      return 0
+      ;;
+    --password|--dump-text|--csv)
+      COMPREPLY=( $(compgen -f -- "$cur") )
+      return 0
+      ;;
+    --print-completion)
+      COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") )
+      return 0
+      ;;
+  esac
+
+  if [[ "$cur" == -* ]]; then
+    COMPREPLY=( $(compgen -W "--top --ngrams --min-count --keep-stopwords --no-lemma --password --dump-text --csv --plot --print-completion" -- "$cur") )
+    return 0
+  fi
+
+  COMPREPLY=( $(compgen -f -- "$cur") )
+}
+complete -F _docfreq_completion docfreq
+""",
+    }
+    sys.stdout.write(scripts[shell])
+    if not scripts[shell].endswith("\n"):
+        sys.stdout.write("\n")
+    sys.stdout.flush()
 
 
 def decrypt_docx_if_needed(path: Path, password: str | None) -> tuple[Path, Path | None]:
@@ -237,6 +309,19 @@ def write_csv(results: dict[str, list[tuple[str, int]]], output_path: Path) -> N
                 writer.writerow([kind, term, count])
 
 
+def write_text_dump(text: str, destination: str) -> None:
+    if destination in {"-", "/dev/stdout"}:
+        sys.stdout.write(text)
+        if not text.endswith("\n"):
+            sys.stdout.write("\n")
+        sys.stdout.flush()
+        return
+
+    output_path = Path(destination).expanduser()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(text, encoding="utf-8")
+
+
 def plot_counts(pairs: list[tuple[str, int]]) -> None:
     if not pairs:
         print("No results available to plot.", file=sys.stderr)
@@ -267,9 +352,22 @@ def main() -> int:
     args = parse_args()
 
     try:
+        if args.print_completion:
+            print_completion(args.print_completion)
+            return 0
+
+        if not args.input_paths:
+            raise DocfreqError("Provide at least one input path, or use --print-completion.")
+
         n_values = validate_args(args)
         input_paths = [Path(value).expanduser().resolve() for value in args.input_paths]
         text = extract_combined_text(input_paths, password=args.password)
+
+        if args.dump_text_path is not None:
+            write_text_dump(text, args.dump_text_path)
+            if args.dump_text_path not in {"-", "/dev/stdout"}:
+                print(f"Wrote extracted text to {args.dump_text_path}")
+
         nlp = load_nlp()
         doc = nlp(text)
         tokens = normalize_tokens(doc, args.keep_stopwords, args.no_lemma)

@@ -16,7 +16,7 @@ It also supports plain `.txt` and `.md` inputs, encrypted `.docx` files when you
 
 - macOS
 - Homebrew
-- Python 3.12 recommended
+- Python 3.12
 
 System packages used by the workflow:
 
@@ -26,9 +26,30 @@ brew install python pipx gnuplot youplot
 pipx ensurepath
 ```
 
-## Setup
+## Install
 
-Create the virtual environment and install dependencies:
+For a global command with isolated dependencies, use `pipx`:
+
+```bash
+pipx install --python /opt/homebrew/bin/python3.12 git+https://github.com/marqueymarc/docfreq.git
+```
+
+To install from a local checkout while developing:
+
+```bash
+cd /path/to/docfreq
+pipx install --python /opt/homebrew/bin/python3.12 .
+```
+
+To upgrade later:
+
+```bash
+pipx upgrade docfreq
+```
+
+## Development Setup
+
+If you want to work on the repo directly, create a local virtual environment:
 
 ```bash
 /opt/homebrew/bin/python3.12 -m venv .venv
@@ -41,12 +62,14 @@ chmod +x docfreq docfreq.py
 
 ## Usage
 
-Run the wrapper command from the project directory:
+After `pipx install`, run `docfreq` from anywhere:
 
 ```bash
-./docfreq myfile.docx
-./docfreq chapter1.docx chapter2.docx notes.txt
+docfreq myfile.docx
+docfreq chapter1.docx chapter2.docx notes.txt
 ```
+
+If you're using the repo-local wrapper instead of `pipx`, the same commands work as `./docfreq ...`.
 
 Command options:
 
@@ -57,25 +80,58 @@ Command options:
 - `--keep-stopwords`: keep stopwords
 - `--no-lemma`: disable lemmatization
 - `--password`: password for encrypted Office files
+- `--dump-text [PATH]`: write the combined extracted text before counting; omit the path, use `-`, or use `/dev/stdout` for stdout
+- `--print-completion bash|zsh`: print a shell completion script and exit
 - `--csv PATH`: write results to CSV
 - `--plot`: render terminal charts for the requested n-gram results
 
 Example:
 
 ```bash
-./docfreq myfile.docx mynotes.txt --top 25 --ngrams 1,2 --csv freq.csv --plot
+docfreq myfile.docx mynotes.txt --top 25 --ngrams 1,2 --csv freq.csv --plot
+docfreq myfile.docx --dump-text extracted.txt
+docfreq myfile.docx --dump-text
+```
+
+## Shell Completion
+
+For zsh in the current shell:
+
+```bash
+eval "$(docfreq --print-completion zsh)"
+```
+
+To make zsh completion persistent:
+
+```bash
+mkdir -p ~/.zfunc
+docfreq --print-completion zsh > ~/.zfunc/_docfreq
+```
+
+Then make sure your `~/.zshrc` includes:
+
+```bash
+fpath=(~/.zfunc $fpath)
+autoload -Uz compinit
+compinit
+```
+
+For bash in the current shell:
+
+```bash
+eval "$(docfreq --print-completion bash)"
 ```
 
 For encrypted `.docx` files, either pass the password directly:
 
 ```bash
-./docfreq secret.docx --password 'your-password' --plot
+docfreq secret.docx --password 'your-password' --plot
 ```
 
 or use an environment variable so the password does not appear in shell history:
 
 ```bash
-DOCFREQ_PASSWORD='your-password' ./docfreq secret.docx --plot
+DOCFREQ_PASSWORD='your-password' docfreq secret.docx --plot
 ```
 
 ## Output
@@ -91,4 +147,5 @@ If you want charts in Excel, open the generated CSV there and create a bar chart
 - `.docx` extraction is handled through `docling.document_converter.DocumentConverter`
 - when multiple files are passed, `docfreq` concatenates their extracted text before counting
 - if `termgraph` is unavailable, run without `--plot`
-- Python 3.13+ may currently resolve older Docling builds; the setup above uses Python 3.12 because that was the stable path during verification
+- install and packaging currently target Python 3.12 because that was the stable Docling path during verification
+- the `pipx` install path uses the package metadata in `pyproject.toml`, including the bundled spaCy English model

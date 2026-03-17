@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "docfreq"
+version = "0.1.0"
+description = "Extract text from documents and report smart word frequencies and n-gram counts."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "spacy",
+  "textacy",
+  "docling==2.80.0",
+  "termgraph",
+  "wordfreq",
+  "msoffcrypto-tool",
+  "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+]
+
+[project.scripts]
+docfreq = "docfreq:main"
+
+[tool.setuptools]
+py-modules = ["docfreq"]

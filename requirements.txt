@@ -1,6 +1,6 @@
 spacy
 textacy
-docling
+docling==2.80.0
 termgraph
 wordfreq
 msoffcrypto-tool
