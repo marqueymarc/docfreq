@@ -4,6 +4,8 @@
 
 It also supports plain `.txt` and `.md` inputs, encrypted `.docx` files when you provide a password, and concatenating multiple inputs into one combined analysis.
 
+Current release: `1.1.9` built as `2026.03.17.gmt00`.
+
 ## What "smart" means here
 
 - lemmatization by default
@@ -80,8 +82,10 @@ Command options:
 - `--keep-stopwords`: keep stopwords
 - `--no-lemma`: disable lemmatization
 - `--password`: password for encrypted Office files
+- `--keep-words-file PATH`: file containing words that should not be treated as stopwords; can also come from `DOCFREQ_KEEP_WORDS_FILE`
 - `--dump-text [PATH]`: write the combined extracted text before counting; omit the path, use `-`, or use `/dev/stdout` for stdout
 - `--print-completion bash|zsh`: print a shell completion script and exit
+- `--version`: print the semantic version and UTC build stamp
 - `--csv PATH`: write results to CSV
 - `--plot`: render terminal charts for the requested n-gram results
 
@@ -91,6 +95,21 @@ Example:
 docfreq myfile.docx mynotes.txt --top 25 --ngrams 1,2 --csv freq.csv --plot
 docfreq myfile.docx --dump-text extracted.txt
 docfreq myfile.docx --dump-text
+docfreq myfile.docx --keep-words-file keep-words.txt
+docfreq --version
+```
+
+Example `keep-words.txt`:
+
+```text
+bottom
+top
+```
+
+You can also use an environment variable:
+
+```bash
+DOCFREQ_KEEP_WORDS_FILE=keep-words.txt docfreq myfile.docx
 ```
 
 ## Shell Completion
@@ -149,3 +168,4 @@ If you want charts in Excel, open the generated CSV there and create a bar chart
 - if `termgraph` is unavailable, run without `--plot`
 - install and packaging currently target Python 3.12 because that was the stable Docling path during verification
 - the `pipx` install path uses the package metadata in `pyproject.toml`, including the bundled spaCy English model
+- repo-level versioning instructions live in [AGENTS.md](/Volumes/Humboldt/marc-data/src/docfreq/AGENTS.md)

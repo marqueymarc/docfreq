@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docfreq"
-version = "0.1.0"
+version = "1.1.9"
 description = "Extract text from documents and report smart word frequencies and n-gram counts."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

@@ -18,6 +18,11 @@ from typing import Iterable
 import spacy
 
 
+APP_NAME = "docfreq"
+APP_VERSION = "1.1.9"
+APP_BUILD_DATE = "2026.03.17.gmt00"
+APP_VERSION_STRING = f"{APP_NAME} {APP_VERSION} ({APP_BUILD_DATE})"
+
 SUPPORTED_EXTENSIONS = {".docx", ".txt", ".md"}
 SUPPORTED_SHELLS = ("bash", "zsh")
 
@@ -62,6 +67,10 @@ def parse_args() -> argparse.Namespace:
         help="Password for encrypted Office files. You can also set DOCFREQ_PASSWORD.",
     )
     parser.add_argument(
+        "--keep-words-file",
+        help="Path to a file containing words that should not be treated as stopwords. You can also set DOCFREQ_KEEP_WORDS_FILE.",
+    )
+    parser.add_argument(
         "--dump-text",
         dest="dump_text_path",
         nargs="?",
@@ -73,12 +82,19 @@ def parse_args() -> argparse.Namespace:
         choices=SUPPORTED_SHELLS,
         help="Print a shell completion script for bash or zsh and exit.",
     )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=APP_VERSION_STRING,
+    )
     parser.add_argument("--csv", dest="csv_path", help="Optional CSV output path")
     parser.add_argument(
         "--plot",
         action="store_true",
         help="Render terminal bar charts for the requested n-gram results",
     )
+    if hasattr(parser, "parse_intermixed_args"):
+        return parser.parse_intermixed_args()
     return parser.parse_args()
 
 
@@ -111,6 +127,15 @@ def resolve_password(password: str | None) -> str | None:
     return None
 
 
+def resolve_keep_words_file(path: str | None) -> str | None:
+    if path:
+        return path
+    env_path = os.getenv("DOCFREQ_KEEP_WORDS_FILE")
+    if env_path:
+        return env_path
+    return None
+
+
 def print_completion(shell: str) -> None:
     scripts = {
         "zsh": """#compdef docfreq
@@ -122,10 +147,12 @@ _docfreq() {
     '--keep-stopwords[Keep stopwords instead of filtering them out]' \\
     '--no-lemma[Use the original token text instead of spaCy lemmas]' \\
     '--password[Password for encrypted Office files]:password:' \\
+    '--keep-words-file[File containing words to keep out of stopword filtering]:word file:_files' \\
     '--dump-text=-[Write extracted text before counting]:output path:_files' \\
     '--csv[Write results to CSV]:csv file:_files' \\
     '--plot[Render terminal bar charts for requested n-grams]' \\
     '--print-completion[Print a shell completion script and exit]:shell:(bash zsh)' \\
+    '--version[Print version information and exit]' \\
     '*:input file:_files'
 }
 compdef _docfreq docfreq
@@ -144,7 +171,7 @@ compdef _docfreq docfreq
       COMPREPLY=( $(compgen -W "1 1,2 1,2,3 2 3" -- "$cur") )
       return 0
       ;;
-    --password|--dump-text|--csv)
+    --password|--keep-words-file|--dump-text|--csv)
       COMPREPLY=( $(compgen -f -- "$cur") )
       return 0
       ;;
@@ -155,7 +182,7 @@ compdef _docfreq docfreq
   esac
 
   if [[ "$cur" == -* ]]; then
-    COMPREPLY=( $(compgen -W "--top --ngrams --min-count --keep-stopwords --no-lemma --password --dump-text --csv --plot --print-completion" -- "$cur") )
+    COMPREPLY=( $(compgen -W "--top --ngrams --min-count --keep-stopwords --no-lemma --password --keep-words-file --dump-text --csv --plot --print-completion --version" -- "$cur") )
     return 0
   fi
 
@@ -241,9 +268,29 @@ def extract_combined_text(paths: list[Path], password: str | None = None) -> str
     return "\n\n".join(extract_text(path, password=password) for path in paths)
 
 
-def load_nlp():
+def load_keep_words(path: str | None) -> set[str]:
+    resolved = resolve_keep_words_file(path)
+    if not resolved:
+        return set()
+
+    keep_words_path = Path(resolved).expanduser()
+    if not keep_words_path.exists():
+        raise DocfreqError(f"Keep-words file not found: {keep_words_path}")
+
+    words = {
+        word.lower()
+        for word in keep_words_path.read_text(encoding="utf-8").split()
+        if word.strip()
+    }
+    return words
+
+
+def load_nlp(keep_words_file: str | None = None):
     try:
-        return spacy.load("en_core_web_sm", disable=["ner", "parser"])
+        nlp = spacy.load("en_core_web_sm", disable=["ner", "parser"])
+        for word in load_keep_words(keep_words_file):
+            nlp.vocab[word].is_stop = False
+        return nlp
     except OSError as exc:
         raise DocfreqError(
             "spaCy model 'en_core_web_sm' is not installed. "
@@ -368,7 +415,7 @@ def main() -> int:
             if args.dump_text_path not in {"-", "/dev/stdout"}:
                 print(f"Wrote extracted text to {args.dump_text_path}")
 
-        nlp = load_nlp()
+        nlp = load_nlp(args.keep_words_file)
         doc = nlp(text)
         tokens = normalize_tokens(doc, args.keep_stopwords, args.no_lemma)
         results = count_terms(tokens, n_values, args.min_count, args.top)

@@ -9,7 +9,10 @@ docfreq chapter1.docx chapter2.docx --ngrams 1,2 --plot
 docfreq myfile.docx --dump-text extracted.txt
 docfreq myfile.docx --dump-text
 docfreq myfile.docx --dump-text -
+docfreq myfile.docx --keep-words-file keep-words.txt
+DOCFREQ_KEEP_WORDS_FILE=keep-words.txt docfreq myfile.docx
 docfreq --print-completion zsh
+docfreq --version
 docfreq myfile.docx --csv out.csv
 docfreq myfile.docx --keep-stopwords --no-lemma
 DOCFREQ_PASSWORD='secret' docfreq encrypted.docx --plot
