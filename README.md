@@ -4,7 +4,7 @@
 
 It also supports plain `.txt` and `.md` inputs, encrypted `.docx` files when you provide a password, and concatenating multiple inputs into one combined analysis.
 
-Current release: `1.1.9` built as `2026.03.17.gmt00`.
+Current release: `1.1.10` built as `2026.03.17.0052` (UTC/GMT).
 
 ## What "smart" means here
 
